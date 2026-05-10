@@ -1,5 +1,5 @@
 """
-FitMirror — Gradio entry point.
+FitMirror - Gradio entry point.
 
 Run locally:    python app.py
 HF Spaces:      this file is auto-launched by the Spaces runtime.
@@ -7,15 +7,15 @@ HF Spaces:      this file is auto-launched by the Spaces runtime.
 UI:
   - Image upload (front-facing full-body photo)
   - Height in cm (number)
-  - Gender (radio) — drives anthropometric depth ratios
-  - Garment type (dropdown) — drives the size chart used
+  - Gender (radio)
+  - Garment type (dropdown)
   - Outputs: annotated image, measurement table, size recommendation,
              friendly error message on failure.
 """
 
 from __future__ import annotations
 
-# --- Monkey-patch gradio_client schema introspection BEFORE importing gradio.
+# Monkey-patch gradio_client schema introspection BEFORE importing gradio.
 # Some gradio_client versions crash on JSON schemas where `additionalProperties`
 # is a bool (which is valid). Wrap _json_schema_to_python_type to short-circuit
 # bool schemas to "Any". Safe no-op on versions that already handle this.
@@ -31,7 +31,7 @@ def _safe_json_to_python(schema, defs=None):
 
 
 _gcu._json_schema_to_python_type = _safe_json_to_python
-# --- end monkey-patch
+# end monkey-patch
 
 import gradio as gr  # noqa: E402
 import numpy as np  # noqa: E402
@@ -54,7 +54,7 @@ GARMENT_LABELS = [g[0] for g in GARMENT_OPTIONS]
 GARMENT_BY_LABEL = {g[0]: g for g in GARMENT_OPTIONS}
 
 
-# --- Image annotation ---------------------------------------------------
+# Image annotation constants.
 
 LANDMARK_DRAW_RADIUS = 5
 LINE_WIDTH = 3
@@ -76,7 +76,6 @@ def _annotate(image_rgb: np.ndarray, landmarks_px: np.ndarray) -> Image.Image:
     img = Image.fromarray(image_rgb).convert("RGB").copy()
     draw = ImageDraw.Draw(img)
 
-    # Skeleton lines
     for a, b in SKELETON_PAIRS:
         if landmarks_px[a, 2] < P.MIN_VISIBILITY or landmarks_px[b, 2] < P.MIN_VISIBILITY:
             continue
@@ -89,7 +88,6 @@ def _annotate(image_rgb: np.ndarray, landmarks_px: np.ndarray) -> Image.Image:
             width=LINE_WIDTH,
         )
 
-    # Landmark dots
     for idx in P.REQUIRED_LANDMARKS:
         if landmarks_px[idx, 2] < P.MIN_VISIBILITY:
             continue
@@ -118,8 +116,6 @@ def _measurements_table_md(m) -> str:
     )
 
 
-# --- Pipeline runner ----------------------------------------------------
-
 def _error_md(msg: str) -> str:
     return (
         "### Couldn't process this photo\n\n"
@@ -134,7 +130,6 @@ def _error_md(msg: str) -> str:
 
 def run(image, height_cm, gender_label, garment_label):
     """Top-level Gradio handler. Returns (annotated_image_or_None, message_md)."""
-    # --- Input validation ---
     if image is None:
         return None, _error_md("Please upload a photo first.")
 
@@ -158,12 +153,11 @@ def run(image, height_cm, gender_label, garment_label):
             "Pick a different garment or update the gender field."
         )
 
-    # --- Pose ---
     try:
         result = P.detect(image)
     except PoseError as e:
         return None, _error_md(str(e))
-    except Exception:  # last-resort safety net so the UI never shows a stack trace
+    except Exception:
         return None, _error_md(
             "Something went wrong reading the image. Try a different photo "
             "(JPEG or PNG, under ~10 MB)."
@@ -175,11 +169,10 @@ def run(image, height_cm, gender_label, garment_label):
     if not P.has_required_landmarks(result):
         missing = ", ".join(P.missing_landmark_names(result))
         return None, _error_md(
-            f"Couldn't see your full body — missing/occluded: **{missing}**. "
+            f"Couldn't see your full body. Missing or occluded: **{missing}**. "
             "Step back so head, hands, and feet are all inside the frame."
         )
 
-    # --- Measure + recommend ---
     try:
         m = measure_all(result, user_height_cm=height_cm, gender=gender)
     except PoseError as e:
@@ -199,33 +192,28 @@ def run(image, height_cm, gender_label, garment_label):
         + "\n\n"
         + rec.to_markdown()
         + "\n\n"
-        + "_Stage 1 demo — single photo, monocular. "
-        "Linear measurements ±2-3 cm; circumferences ±4-6 cm. "
+        + "_Stage 1 demo. Single photo, monocular. "
+        "Linear measurements +/- 2-3 cm; circumferences +/- 4-6 cm. "
         "Use as a starting point for sizing, not as a tailoring spec._"
     )
     return annotated, msg
 
 
-# --- Gradio UI ----------------------------------------------------------
-
 DESCRIPTION = """
-**FitMirror** — Upload one front-facing full-body photo and get body
-measurements + an Indian-wear size recommendation.
+**FitMirror** - Upload one front-facing full-body photo and get body
+measurements plus an Indian-wear size recommendation.
 
-How it works: MediaPipe detects 33 body landmarks → your height is used to
-calibrate cm-per-pixel → linear measurements come from landmark distances →
-chest/waist/hip circumferences combine silhouette width with anthropometric
-depth ratios via the Ramanujan ellipse-perimeter approximation → the result
+How it works: MediaPipe detects 33 body landmarks. Your height is used to
+calibrate cm-per-pixel. Linear measurements come from landmark distances.
+Chest/waist/hip circumferences combine silhouette width with anthropometric
+depth ratios via the Ramanujan ellipse-perimeter approximation. The result
 is matched against standard Indian-wear size charts.
-
-Stage 1 demo. CPU-only. No data is stored.
 """
 
 
 def build_ui() -> gr.Blocks:
-    with gr.Blocks(title="FitMirror — Body Measurement & Sizing") as demo:
+    with gr.Blocks(title="FitMirror - Body Measurement and Sizing") as demo:
         gr.Markdown("# FitMirror")
-        gr.Markdown(DESCRIPTION)
 
         with gr.Row():
             with gr.Column(scale=1):
@@ -252,7 +240,7 @@ def build_ui() -> gr.Blocks:
                     choices=GARMENT_LABELS,
                     value=GARMENT_LABELS[0],
                 )
-                go_btn = gr.Button("Measure & recommend size", variant="primary")
+                go_btn = gr.Button("Measure and recommend size", variant="primary")
 
             with gr.Column(scale=1):
                 image_out = gr.Image(label="Detected pose", type="pil", height=400)
@@ -261,13 +249,14 @@ def build_ui() -> gr.Blocks:
         with gr.Accordion("How accurate is this?", open=False):
             gr.Markdown(
                 "- **Linear measurements** (shoulder, sleeve, torso, inseam): "
-                "typically within **±2-3 cm** when the photo is well framed.\n"
-                "- **Circumferences** (chest, waist, hip): currently **±4-6 cm**, "
-                "limited by the single-camera depth assumption.\n"
-                "- Stage 2 (under development): integrate a monocular depth model "
-                "and SMPL body fitting to push circumferences to **±2-3 cm**.\n\n"
-                "This page shows what's possible with classical anthropometry + a "
-                "free CPU instance — no GPU required."
+                "typically within **+/- 2-3 cm** when the photo is well framed.\n"
+                "- **Circumferences** (chest, waist, hip): currently "
+                "**+/- 4-6 cm**, limited by the single-camera depth assumption.\n"
+                "- Stage 2 (under development): integrate a monocular depth "
+                "model and SMPL body fitting to push circumferences to "
+                "**+/- 2-3 cm**.\n\n"
+                "This page shows what's possible with classical anthropometry "
+                "plus a free CPU instance. No GPU required."
             )
 
         go_btn.click(
@@ -275,6 +264,9 @@ def build_ui() -> gr.Blocks:
             inputs=[image_in, height_in, gender_in, garment_in],
             outputs=[image_out, msg_out],
         )
+
+        # Description placed at the bottom of the page.
+        gr.Markdown(DESCRIPTION)
 
     return demo
 

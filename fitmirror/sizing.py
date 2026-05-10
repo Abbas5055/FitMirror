@@ -195,7 +195,7 @@ def recommend(
         )
     elif confidence == "low":
         reasoning.append(
-            "Dimensions span more than two sizes — body shape may be between "
+            "Dimensions span more than two sizes. Body shape may be between "
             "standard charts. Rounded up; consider a tailored option."
         )
 

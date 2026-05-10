@@ -1,6 +1,5 @@
 ---
 title: FitMirror
-emoji: 👗
 colorFrom: indigo
 colorTo: pink
 sdk: gradio
