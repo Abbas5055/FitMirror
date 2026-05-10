@@ -1,4 +1,4 @@
-gradio==4.44.0
+gradio==4.44.1
 huggingface_hub==0.25.2
 mediapipe==0.10.18
 opencv-python-headless==4.10.0.84
