@@ -237,7 +237,7 @@ def build_ui() -> gr.Blocks:
                 go_btn = gr.Button("Measure & recommend size", variant="primary")
 
             with gr.Column(scale=1):
-                image_out = gr.Image(label="Detected pose", height=400)
+                image_out = gr.Image(label="Detected pose", type="pil", height=400)
                 msg_out = gr.Markdown("Upload a photo and press the button.")
 
         with gr.Accordion("How accurate is this?", open=False):
@@ -262,4 +262,11 @@ def build_ui() -> gr.Blocks:
 
 
 if __name__ == "__main__":
-    build_ui().launch(server_name="0.0.0.0", server_port=7860)
+    # ssr_mode=False: gradio 5.x SSR can break the API endpoint behind the HF
+    # Spaces iframe, surfacing as "No API found" in the browser. Disable it.
+    build_ui().launch(
+        server_name="0.0.0.0",
+        server_port=7860,
+        ssr_mode=False,
+        show_error=True,
+    )
