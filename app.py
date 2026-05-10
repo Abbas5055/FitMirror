@@ -15,9 +15,27 @@ UI:
 
 from __future__ import annotations
 
-import gradio as gr
-import numpy as np
-from PIL import Image, ImageDraw
+# --- Monkey-patch gradio_client schema introspection BEFORE importing gradio.
+# Some gradio_client versions crash on JSON schemas where `additionalProperties`
+# is a bool (which is valid). Wrap _json_schema_to_python_type to short-circuit
+# bool schemas to "Any". Safe no-op on versions that already handle this.
+import gradio_client.utils as _gcu  # noqa: E402
+
+_orig_json_to_python = _gcu._json_schema_to_python_type
+
+
+def _safe_json_to_python(schema, defs=None):
+    if isinstance(schema, bool):
+        return "Any"
+    return _orig_json_to_python(schema, defs)
+
+
+_gcu._json_schema_to_python_type = _safe_json_to_python
+# --- end monkey-patch
+
+import gradio as gr  # noqa: E402
+import numpy as np  # noqa: E402
+from PIL import Image, ImageDraw  # noqa: E402
 
 from fitmirror import pose as P
 from fitmirror.measure import measure_all
