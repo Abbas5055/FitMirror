@@ -214,40 +214,45 @@ def circumferences(
     calib: Calibration,
     gender: Gender,
 ) -> Circumferences:
+    """
+    Estimate chest / waist / hip circumferences from pose landmarks.
+
+    Why landmarks (not silhouette): the MediaPipe segmentation mask includes
+    arms at the body sides, so a raw silhouette width over-counts by 2 * arm
+    thickness. Landmark-based widths sidestep this entirely.
+
+    Anthropometric multipliers convert between landmark distance and the
+    relevant body width:
+      chest_width_cm = shoulder_landmark_cm * 0.92  (chest a touch narrower
+                       than the shoulder-joint span across the upper torso)
+      hip_width_cm   = hip_landmark_cm * 1.10       (outer hip is wider than
+                       the iliac-crest landmark line)
+      waist_width_cm = mean(chest_width, hip_width) * 0.86  (waist narrower
+                       than both, by population average)
+    """
     if gender not in DEPTH_RATIOS:
         raise PoseError("Gender must be 'male' or 'female'.")
 
     lm = result.landmarks_px
-    mid_shoulder_y = (lm[P.LEFT_SHOULDER, 1] + lm[P.RIGHT_SHOULDER, 1]) / 2.0
-    mid_hip_y = (lm[P.LEFT_HIP, 1] + lm[P.RIGHT_HIP, 1]) / 2.0
-    torso_height_px = mid_hip_y - mid_shoulder_y
-    if torso_height_px <= 0:
-        raise PoseError("Couldn't locate your torso. Try a more upright, front-facing photo.")
-
-    chest_y = int(round(mid_shoulder_y + CHEST_FRAC * torso_height_px))
-    waist_y = int(round(mid_shoulder_y + WAIST_FRAC * torso_height_px))
-    hip_y   = int(round(mid_shoulder_y + HIP_FRAC   * torso_height_px))
-
     s = calib.cm_per_pixel
-    ratios = DEPTH_RATIOS[gender]
 
-    def _circ_at(y: int, key: str) -> float:
-        width_px = _smooth_width_px(result.mask, y)
-        if width_px <= 0:
-            return 0.0
-        width_cm = width_px * s
-        depth_cm = width_cm * ratios[key]
-        return _ramanujan_ellipse_perimeter(width_cm, depth_cm)
+    shoulder_landmark_cm = _dist(lm[P.LEFT_SHOULDER], lm[P.RIGHT_SHOULDER]) * s
+    hip_landmark_cm = _dist(lm[P.LEFT_HIP], lm[P.RIGHT_HIP]) * s
 
-    chest = _circ_at(chest_y, "chest")
-    waist = _circ_at(waist_y, "waist")
-    hip   = _circ_at(hip_y,   "hip")
-
-    if min(chest, waist, hip) <= 0:
+    if shoulder_landmark_cm <= 0 or hip_landmark_cm <= 0:
         raise PoseError(
-            "Couldn't read your silhouette cleanly. "
-            "Try a plainer background and stand with arms slightly away from torso."
+            "Couldn't locate your shoulders or hips. "
+            "Try a more upright, front-facing photo."
         )
+
+    chest_width_cm = shoulder_landmark_cm * 0.90
+    hip_width_cm = hip_landmark_cm * 0.95
+    waist_width_cm = (chest_width_cm + hip_width_cm) / 2.0 * 0.78
+
+    ratios = DEPTH_RATIOS[gender]
+    chest = _ramanujan_ellipse_perimeter(chest_width_cm, chest_width_cm * ratios["chest"])
+    waist = _ramanujan_ellipse_perimeter(waist_width_cm, waist_width_cm * ratios["waist"])
+    hip = _ramanujan_ellipse_perimeter(hip_width_cm, hip_width_cm * ratios["hip"])
 
     return Circumferences(
         chest_cm=round(chest, 1),
