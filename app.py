@@ -15,13 +15,9 @@ UI:
 
 from __future__ import annotations
 
-import io
-import traceback
-from typing import Any
-
 import gradio as gr
 import numpy as np
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 from fitmirror import pose as P
 from fitmirror.measure import measure_all
@@ -118,7 +114,7 @@ def _error_md(msg: str) -> str:
     )
 
 
-def run(image: Any, height_cm: float, gender_label: str, garment_label: str):
+def run(image, height_cm, gender_label, garment_label):
     """Top-level Gradio handler. Returns (annotated_image_or_None, message_md)."""
     # --- Input validation ---
     if image is None:
